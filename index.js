@@ -1,14 +1,13 @@
-require('dotenv').config(); // 1. Charger les variables d'environnement
-const express = require('express'); // 2. Importer Express
-const pool = require('./db'); // 3. Importer la connexion DB (votre fichier db.js)
+require('dotenv').config();
+const express = require('express');
+const pool = require('./db');
 
-const app = express(); // 4. CRÉER l'objet 'app' (C'est ce qui manquait !)
+const app = express();
+app.use(express.json());
 
-app.use(express.json()); // 5. Permettre à l'app de lire le JSON
+// --- ROUTES : UTILISATEURS (CRUD) ---
 
-// --- VOS ROUTES ---
-
-// Route pour créer un utilisateur (celle qui posait problème)
+// Créer un utilisateur
 app.post('/users', async (req, res) => {
     try {
         const { name, email } = req.body;
@@ -23,77 +22,63 @@ app.post('/users', async (req, res) => {
     }
 });
 
-// --- DÉMARRAGE DU SERVEUR ---
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log("-----------------------------------------");
-    console.log(`SERVEUR BANCAIRE LANCÉ SUR LE PORT ${PORT}`);
-    console.log(`Lien : http://localhost:${PORT}/api-docs`);
-    console.log("-----------------------------------------");
+// Mettre à jour un utilisateur (Requis pour le Devoir)
+app.put('/users/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nom } = req.body;
+        const result = await pool.query(
+            'UPDATE clients SET nom = $1 WHERE id = $2 RETURNING *',
+            [nom, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
+
+// --- ROUTES : TRANSACTIONS ---
+
 /**
  * @swagger
  * /transfer:
  * post:
- * summary: Effectuer un virement entre deux comptes
- * tags: [Transactions]
- * requestBody:
- * required: true
- * content:
- * application/json:
- * schema:
- * type: object
- * properties:
- * from_account: { type: integer }
- * to_account: { type: integer }
- * amount: { type: number }
+ * summary: Effectuer un virement (Retrait + Dépôt)
  */
 app.post('/transfer', async (req, res) => {
-    const client = await pool.connect(); // On utilise un client spécifique pour la transaction
+    const client = await pool.connect();
     try {
         const { from_account, to_account, amount } = req.body;
-        
-        await client.query('BEGIN'); // Début de la transaction
+        await client.query('BEGIN');
 
-        // 1. Débiter le compte émetteur
+        // 1. Débit (Retrait)
         const debitRes = await client.query(
             'UPDATE comptes SET solde = solde - $1 WHERE id = $2 AND solde >= $1 RETURNING solde',
             [amount, from_account]
         );
 
-        if (debitRes.rowCount === 0) throw new Error('Solde insuffisant ou compte inexistant');
+        if (debitRes.rowCount === 0) throw new Error('Fonds insuffisants');
 
-        // 2. Créditer le compte récepteur
+        // 2. Crédit (Dépôt)
         await client.query('UPDATE comptes SET solde = solde + $1 WHERE id = $2', [amount, to_account]);
 
-        // 3. Enregistrer la trace dans la table transactions
+        // 3. Historique
         await client.query(
             'INSERT INTO transactions (compte_id, montant, type_transaction) VALUES ($1, $2, $3)',
             [from_account, -amount, 'virement_sortant']
         );
 
-        await client.query('COMMIT'); // On valide tout
-        res.json({ message: "Virement effectué avec succès" });
+        await client.query('COMMIT');
+        res.json({ message: "Transfert réussi !" });
     } catch (err) {
-        await client.query('ROLLBACK'); // En cas d'erreur, on annule tout
+        await client.query('ROLLBACK');
         res.status(400).json({ error: err.message });
     } finally {
         client.release();
     }
 });
-/**
- * @swagger
- * /transactions/{compte_id}:
- * get:
- * summary: Liste des transactions d'un compte
- * tags: [Transactions]
- * parameters:
- * - in: path
- * name: compte_id
- * required: true
- * schema:
- * type: integer
- */
+
+// Consulter les transactions
 app.get('/transactions/:compte_id', async (req, res) => {
     try {
         const { compte_id } = req.params;
@@ -106,71 +91,19 @@ app.get('/transactions/:compte_id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-// AJOUTE CECI APRÈS TES ROUTES /users
-app.post('/transfer', async (req, res) => {
-    const client = await pool.connect();
-    try {
-        const { from_account, to_account, amount } = req.body;
-        await client.query('BEGIN'); // Début de la transaction sécurisée
 
-        // Retrait d'argent
-        const debit = await client.query(
-            'UPDATE comptes SET solde = solde - $1 WHERE id = $2 AND solde >= $1 RETURNING solde',
-            [amount, from_account]
-        );
+// --- DÉMARRAGE ET EXPORT ---
 
-        if (debit.rowCount === 0) throw new Error('Fonds insuffisants');
+const PORT = process.env.PORT || 3000;
 
-        // Ajout d'argent
-        await client.query('UPDATE comptes SET solde = solde + $1 WHERE id = $2', [amount, to_account]);
+// On ne lance app.listen que si on n'est PAS en mode test
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => {
+        console.log("-----------------------------------------");
+        console.log(`SERVEUR BANCAIRE LANCÉ SUR LE PORT ${PORT}`);
+        console.log("-----------------------------------------");
+    });
+}
 
-        // Historisation
-        await client.query(
-            'INSERT INTO transactions (compte_id, montant, type_transaction) VALUES ($1, $2, $3)',
-            [from_account, -amount, 'virement_sortant']
-        );
-
-        await client.query('COMMIT'); // Validation finale
-        res.json({ message: "Virement réussi !" });
-    } catch (err) {
-        await client.query('ROLLBACK'); // Annulation si erreur
-        res.status(400).json({ error: err.message });
-    } finally {
-        client.release();
-    }
-});
-app.post('/transfer', async (req, res) => {
-    const { from_account, to_account, amount } = req.body;
-    const client = await pool.connect();
-    
-    try {
-        await client.query('BEGIN'); // Début de la transaction sécurisée
-
-        // 1. Vérifier le solde et débiter
-        const resDebit = await client.query(
-            'UPDATE comptes SET solde = solde - $1 WHERE id = $2 AND solde >= $1 RETURNING solde',
-            [amount, from_account]
-        );
-
-        if (resDebit.rowCount === 0) {
-            throw new Error('Fonds insuffisants ou compte inexistant');
-        }
-
-        // 2. Créditer le compte destinataire
-        await client.query('UPDATE comptes SET solde = solde + $1 WHERE id = $2', [amount, to_account]);
-
-        // 3. Enregistrer l'historique
-        await client.query(
-            'INSERT INTO transactions (compte_id, montant, type_transaction) VALUES ($1, $2, $3)',
-            [from_account, -amount, 'virement_sortant']
-        );
-
-        await client.query('COMMIT'); // On valide tout
-        res.json({ message: "Transfert réussi !" });
-    } catch (err) {
-        await client.query('ROLLBACK'); // En cas de souci, on annule tout
-        res.status(400).json({ error: err.message });
-    } finally {
-        client.release();
-    }
-});
+// CRUCIAL POUR JEST/SUPERTEST
+module.exports = app;

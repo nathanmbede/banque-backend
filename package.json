@@ -1,14 +1,14 @@
 {
   "name": "projet-banque",
   "version": "1.0.0",
-  "description": "",
+  "description": "Système de gestion bancaire avec tests automatisés",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --coverage"
   },
   "keywords": [],
-  "author": "",
+  "author": "MBEDE Nathanael",
   "license": "ISC",
   "dependencies": {
     "dotenv": "^17.4.2",
@@ -16,5 +16,9 @@
     "pg": "^8.20.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
   }
 }
