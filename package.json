@@ -5,20 +5,27 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "jest --coverage"
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "MBEDE Nathanael",
   "license": "ISC",
   "dependencies": {
+    "@rolldown/binding-win32-x64-msvc": "^1.1.1",
+    "axios": "^1.16.0",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "pg": "^8.20.0",
-    "swagger-jsdoc": "^6.2.8",
+    "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "supertest": "^7.0.0"
+    "supertest": "^7.2.2",
+    "vitest": "^1.6.1"
+  },
+  "overrides": {
+    "qs": "^6.15.2"
   }
 }

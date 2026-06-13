@@ -1,0 +1,184 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Banque API UY1 - Système Complet",
+    "description": "API de gestion bancaire incluant clients, comptes et transactions sécurisées.",
+    "version": "1.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Serveur de développement local"
+    }
+  ],
+  "tags": [
+    { "name": "Utilisateurs", "description": "Gestion des clients (CRUD)" },
+    { "name": "Comptes", "description": "Gestion des comptes bancaires" },
+    { "name": "Opérations", "description": "Mouvements de fonds (Virements, Dépôts)" },
+    { "name": "Transactions", "description": "Historique et audit des mouvements" }
+  ],
+  "paths": {
+    "/users": {
+      "get": {
+        "summary": "Liste de tous les clients",
+        "tags": ["Utilisateurs"],
+        "responses": { "200": { "description": "Liste récupérée avec succès" } }
+      },
+      "post": {
+        "summary": "Ajouter un nouveau client",
+        "tags": ["Utilisateurs"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["nom", "email"],
+                "properties": {
+                  "nom": { "type": "string", "example": "Jean Dupont" },
+                  "email": { "type": "string", "example": "jean.dupont@email.com" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Client créé" }, "400": { "description": "Données invalides" } }
+      }
+    },
+    "/users/{id}": {
+      "put": {
+        "summary": "Modifier les informations d'un client",
+        "tags": ["Utilisateurs"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nom": { "type": "string" },
+                  "email": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Client mis à jour" }, "404": { "description": "Non trouvé" } }
+      },
+      "delete": {
+        "summary": "Supprimer un client",
+        "tags": ["Utilisateurs"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Client supprimé" } }
+      }
+    },
+    "/accounts": {
+      "post": {
+        "summary": "Créer un nouveau compte bancaire",
+        "tags": ["Comptes"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["client_id", "solde_initial"],
+                "properties": {
+                  "client_id": { "type": "integer", "example": 1 },
+                  "solde_initial": { "type": "number", "minimum": 0, "example": 5000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { 
+          "201": { "description": "Compte créé avec succès" }, 
+          "404": { "description": "Client non trouvé" },
+          "500": { "description": "Erreur serveur" } 
+        }
+      }
+    },
+    "/accounts/{id}": {
+      "get": {
+        "summary": "Obtenir les détails et le solde d'un compte",
+        "tags": ["Comptes"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }],
+        "responses": { 
+          "200": { "description": "Détails du compte récupérés" }, 
+          "404": { "description": "Compte introuvable" } 
+        }
+      }
+    },
+    "/accounts/deposit": {
+      "post": {
+        "summary": "Effectuer un dépôt sur un compte",
+        "tags": ["Opérations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["compteId", "montant"],
+                "properties": {
+                  "compteId": { "type": "integer", "example": 1 },
+                  "montant": { "type": "number", "minimum": 1, "example": 25000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Dépôt réussi" }, "400": { "description": "Montant ou compte invalide" } }
+      }
+    },
+    "/transfer": {
+      "post": {
+        "summary": "Virement de compte à compte (Max 500.000 FCFA)",
+        "tags": ["Opérations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["from_account", "to_account", "amount"],
+                "properties": {
+                  "from_account": { "type": "integer", "example": 1 },
+                  "to_account": { "type": "integer", "example": 2 },
+                  "amount": { "type": "number", "maximum": 500000, "example": 1000 },
+                  "telephone": { "type": "string", "example": "677000000" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { 
+          "200": { "description": "Virement effectué avec succès" }, 
+          "400": { "description": "Solde insuffisant, limite dépassée ou compte inexistant" } 
+        }
+      }
+    },
+    "/transactions": {
+      "get": {
+        "summary": "Historique complet des transactions",
+        "tags": ["Transactions"],
+        "responses": { "200": { "description": "Succès" } }
+      }
+    },
+    "/transactions/{id}": {
+      "get": {
+        "summary": "Détails d'une transaction spécifique",
+        "tags": ["Transactions"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Succès" }, "404": { "description": "Non trouvée" } }
+      },
+      "delete": {
+        "summary": "Annuler et supprimer une transaction (Réajuste le solde)",
+        "tags": ["Transactions"],
+        "description": "Attention : cette opération modifie le solde du compte lié pour annuler l'impact financier.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Transaction annulée" }, "500": { "description": "Erreur serveur" } }
+      }
+    }
+  }
+}
